@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { selectVisibleTargets, useArmStore } from '../store/useArmStore'
 
-/** ↑ / ↓ — следующая/предыдущая цель в таблице, Esc — снять выбор. */
 export function useKeyboard(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -43,8 +43,8 @@ describe('connection', () => {
     }
     unsub()
     expect(updates).toBeLessThanOrEqual(5)
-    expect(useArmStore.getState().targets['T-1'].x).toBe(99) // показан самый свежий
-    expect(tracks.get('T-1')!.x).toBe(99) // карта получила каждый пакет
+    expect(useArmStore.getState().targets['T-1'].x).toBe(99)
+    expect(tracks.get('T-1')!.x).toBe(99)
   })
 
   it('дубль или устаревший пакет (seq меньше) игнорируется', () => {
@@ -82,7 +82,7 @@ describe('connection', () => {
 
   it('остановка соединения убирает все таймеры и данные карты', () => {
     online()
-    sendCommand('REQUEST_VIDEO', 'T-1') // висит таймер ожидания ack
+    sendCommand('REQUEST_VIDEO', 'T-1')
     stop()
     expect(vi.getTimerCount()).toBe(0)
     expect(tracks.size).toBe(0)

@@ -6,7 +6,6 @@ import { useArmStore } from '../store/useArmStore'
 import type { CommandAction } from '../types'
 import { IconClose, IconDrop, IconJam, IconVideo } from './icons'
 
-// эти команды выполняются только после подтверждения оператора
 const NEEDS_CONFIRM: Record<CommandAction, boolean> = {
   EW_HANDOFF: true,
   REQUEST_VIDEO: false,
@@ -27,7 +26,6 @@ export function TargetCard() {
   )
   const result = useArmStore((s) => (s.selectedId ? s.lastResult[s.selectedId] : undefined))
 
-  // подтверждение привязано к цели: выбрали другую - оно пропадает само
   const [confirm, setConfirm] = useState<{ action: CommandAction; targetId: string } | null>(null)
   const confirming = confirm && confirm.targetId === selectedId ? confirm.action : null
   const setConfirming = (action: CommandAction | null) =>

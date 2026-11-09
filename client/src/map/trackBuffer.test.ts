@@ -15,17 +15,16 @@ describe('trackBuffer', () => {
   })
 
   it('между пакетами двигает цель по вектору скорости, без скачка', () => {
-    // курс 90° (на восток), 100 м/с
     ingestTargets([T('a', { x: 0, y: 0, course: 90, speed: 100 })], 0)
     let prevX = 0
     for (let t = 16; t <= 1000; t += 16) {
       advanceTracks(t, 16)
       const x = tracks.get('a')!.dx
-      expect(x).toBeGreaterThanOrEqual(prevX) // только вперёд
-      expect(x - prevX).toBeLessThan(10) // за кадр не больше 10 м при 100 м/с
+      expect(x).toBeGreaterThanOrEqual(prevX)
+      expect(x - prevX).toBeLessThan(10)
       prevX = x
     }
-    expect(prevX).toBeGreaterThan(80) // за 1 с почти догнал расчётные 100 м
+    expect(prevX).toBeGreaterThan(80)
   })
 
   it('новый пакет с поправкой не даёт рывка', () => {
@@ -35,7 +34,7 @@ describe('trackBuffer', () => {
     advanceTracks(116, 16)
     const step = tracks.get('a')!.dx
     expect(step).toBeGreaterThan(0)
-    expect(step).toBeLessThan(300 * 0.2) // подтягивается постепенно
+    expect(step).toBeLessThan(300 * 0.2)
   })
 
   it('не «додумывает» движение дольше 2 секунд без данных', () => {

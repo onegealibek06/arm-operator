@@ -1,16 +1,3 @@
-"""
-Эмулятор бэкенда КП: генерирует воздушную обстановку и шлёт телеметрию по WebSocket.
-
-Запуск:  python simulator.py            (10 пакетов/с)
-         python simulator.py --hz 50    (стресс-тест)
-
-WebSocket:  ws://localhost:8000/ws
-Отладка (имитация сбоев сети):
-  POST /debug/stall?seconds=8   — соединение живо, но данные не идут (как выдернутый кабель)
-  POST /debug/drop              — сервер разрывает все соединения
-  POST /debug/rate?hz=50        — сменить частоту пакетов на лету
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -26,15 +13,13 @@ from dataclasses import dataclass, field
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
-# --- Параметры сцены -------------------------------------------------------
 
-BASE_LAT, BASE_LON = 51.1694, 71.4491  # условная точка КП
-RANGE_M = 10_000  # дальность обзора
-ZONE_M = 2_000  # охраняемая зона
+BASE_LAT, BASE_LON = 51.1694, 71.4491
+RANGE_M = 10_000
+ZONE_M = 2_000
 MIN_TARGETS, MAX_TARGETS = 3, 5
 
 TARGET_TYPES = {
-    # тип: (мин. скорость, макс. скорость м/с, высота м)
     "UAV": (25, 45, 400),
     "FPV": (30, 60, 80),
     "HELICOPTER": (40, 70, 300),
@@ -49,13 +34,13 @@ _id_counter = itertools.count(1)
 class Target:
     id: str
     type: str
-    x: float  # метры на восток от КП
-    y: float  # метры на север от КП
-    speed: float  # м/с
-    course: float  # градусы, 0 = север, по часовой
+    x: float
+    y: float
+    speed: float
+    course: float
     altitude: float
-    attacking: bool  # летит на КП
-    status: str = "TRACKING"  # TRACKING | EW_ASSIGNED | VIDEO_REQUESTED
+    attacking: bool
+    status: str = "TRACKING"
     ew_since: float | None = None
     born: float = field(default_factory=time.monotonic)
 
@@ -79,7 +64,6 @@ class Target:
         return "LOW"
 
     def to_json(self) -> dict:
-        # Плоская проекция метров в градусы — для учебного эмулятора достаточно.
         lat = BASE_LAT + self.y / 111_320
         lon = BASE_LON + self.x / (111_320 * math.cos(math.radians(BASE_LAT)))
         return {
@@ -123,9 +107,6 @@ def spawn_target() -> Target:
     )
 
 
-# --- Мир -------------------------------------------------------------------
-
-
 class World:
     def __init__(self) -> None:
         self.targets: dict[str, Target] = {}
@@ -137,12 +118,10 @@ class World:
         now = time.monotonic()
         for t in list(self.targets.values()):
             if t.status == "EW_ASSIGNED":
-                # РЭБ подавил канал управления: цель теряет скорость и уходит от КП
                 away = (t.bearing_to_base + 180) % 360
                 t.course += ((away - t.course + 180) % 360 - 180) * min(1.0, dt * 0.6)
                 t.speed = max(8.0, t.speed * (1 - 0.15 * dt))
             elif t.attacking:
-                # Атакующая цель доворачивает на КП
                 d = (t.bearing_to_base - t.course + 180) % 360 - 180
                 t.course += max(-8 * dt, min(8 * dt, d))
             else:
@@ -182,8 +161,6 @@ class World:
         return False, f"Неизвестная команда {action}"
 
 
-# --- Сервер ----------------------------------------------------------------
-
 @contextlib.asynccontextmanager
 async def lifespan(_: FastAPI):
     task = asyncio.create_task(simulation_loop())
@@ -194,7 +171,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="ARM telemetry simulator", lifespan=lifespan)
 world = World()
 clients: set[WebSocket] = set()
-background: set[asyncio.Task] = set()  # держим ссылки, иначе GC может удалить задачу до завершения
+background: set[asyncio.Task] = set()
 settings = {"hz": 10.0, "stall_until": 0.0}
 seq = itertools.count(1)
 
@@ -204,7 +181,6 @@ async def broadcast(message: dict) -> None:
     dead = []
     for ws in list(clients):
         try:
-            # зависший клиент не должен тормозить рассылку остальным
             await asyncio.wait_for(ws.send_text(data), timeout=1.0)
         except Exception:
             dead.append(ws)
@@ -220,7 +196,7 @@ async def simulation_loop() -> None:
         world.step(now - last)
         last = now
         if now < settings["stall_until"]:
-            continue  # «кабель выдернут»: TCP живой, данных нет
+            continue
         await broadcast(
             {
                 "type": "telemetry",
@@ -265,7 +241,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
 
 async def handle_command(ws: WebSocket, msg: dict) -> None:
-    await asyncio.sleep(random.uniform(0.15, 0.6))  # задержка исполнительного модуля
+    await asyncio.sleep(random.uniform(0.15, 0.6))
     ok, text = world.apply_command(str(msg.get("action")), str(msg.get("targetId")))
     with contextlib.suppress(Exception):
         await ws.send_text(

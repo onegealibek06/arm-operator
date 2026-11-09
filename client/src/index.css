@@ -61,8 +61,6 @@ svg.icon {
   flex: none;
 }
 
-/* каркас */
-
 .app {
   height: 100dvh;
   display: grid;
@@ -125,8 +123,6 @@ svg.icon {
 .panel-head .spacer {
   flex: 1;
 }
-
-/* шапка */
 
 .header {
   display: flex;
@@ -307,8 +303,6 @@ svg.icon {
   }
 }
 
-/* метка угрозы */
-
 .chip {
   display: inline-flex;
   align-items: center;
@@ -345,8 +339,6 @@ svg.icon {
   border-radius: 50%;
 }
 
-/* фильтр-сегменты */
-
 .segments {
   display: flex;
   padding: 2px;
@@ -380,8 +372,6 @@ svg.icon {
 .segments button[aria-pressed='true'] i {
   opacity: 1;
 }
-
-/* таблица */
 
 .table-panel {
   flex: 1 1 50%;
@@ -477,8 +467,6 @@ tr.is-selected:hover {
   color: var(--text-3);
 }
 
-/* карта */
-
 .map-body {
   position: relative;
   flex: 1;
@@ -551,8 +539,6 @@ tr.is-selected:hover {
   color: var(--text-2);
 }
 
-/* кнопки */
-
 .btn {
   display: inline-flex;
   align-items: center;
@@ -591,8 +577,6 @@ tr.is-selected:hover {
 .btn--sm {
   padding: 4px 10px;
 }
-
-/* выбранная цель */
 
 .card-panel {
   flex: 0 0 auto;
@@ -691,8 +675,6 @@ tr.is-selected:hover {
   color: var(--med);
 }
 
-/* журнал */
-
 .log {
   list-style: none;
   margin: 0;
@@ -731,8 +713,6 @@ tr.is-selected:hover {
 .log .lvl-cmd i {
   background: var(--accent);
 }
-
-/* адаптив */
 
 @media (max-width: 1280px) {
   .main {

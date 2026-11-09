@@ -83,7 +83,6 @@ export function TargetTable() {
   )
 }
 
-// memo + стабильные ссылки в сторе: неизменившиеся строки не перерисовываются
 const Row = memo(function Row({ t, selected, onSelect }: { t: Target; selected: boolean; onSelect: (id: string) => void }) {
   const ref = useRef<HTMLTableRowElement>(null)
   useEffect(() => {

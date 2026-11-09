@@ -8,7 +8,7 @@ from simulator import RANGE_M, World, app, spawn_target
 
 def test_world_keeps_3_to_5_targets_inside_range():
     w = World()
-    for _ in range(3000):  # ~5 минут симуляции
+    for _ in range(3000):
         w.step(0.1)
         assert 3 <= len(w.targets) <= 5
         for t in w.targets.values():
@@ -43,7 +43,7 @@ def test_websocket_hello_telemetry_and_ack():
         assert tel["type"] == "telemetry" and 3 <= len(tel["targets"]) <= 5
         tid = tel["targets"][0]["id"]
         ws.send_json({"type": "command", "requestId": "r-1", "action": "REQUEST_VIDEO", "targetId": tid})
-        ws.send_text("garbage")  # битое сообщение не должно ронять сервер
+        ws.send_text("garbage")
         while (msg := ws.receive_json())["type"] != "ack":
             pass
         assert msg["requestId"] == "r-1" and msg["ok"] is True
@@ -52,7 +52,7 @@ def test_websocket_hello_telemetry_and_ack():
 def test_debug_endpoints():
     with TestClient(app) as client:
         assert client.get("/health").json()["ok"] is True
-        assert client.post("/debug/rate?hz=500").json()["hz"] == 200.0  # ограничение сверху
+        assert client.post("/debug/rate?hz=500").json()["hz"] == 200.0
         client.post("/debug/rate?hz=10")
         assert client.post("/debug/stall?seconds=1").json()["stalled_for"] == 1.0
     simulator.settings["stall_until"] = 0.0

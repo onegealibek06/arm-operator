@@ -1,6 +1,5 @@
 import type { ThreatLevel } from '../types'
 
-// Простые иконки inline SVG: без иконочных библиотек и без загрузки из сети.
 type P = { className?: string }
 const base = {
   viewBox: '0 0 24 24',
@@ -62,7 +61,6 @@ export const Logo = () => (
   </svg>
 )
 
-/** Та же форма, что у маркера на карте: угроза различается не только цветом. */
 export const ThreatShape = ({ level }: { level: ThreatLevel }) => {
   const c = level === 'HIGH' ? '#ff4d4f' : level === 'MEDIUM' ? '#f5a524' : '#3ccf91'
   return (

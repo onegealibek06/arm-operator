@@ -53,7 +53,7 @@ describe('useArmStore', () => {
     for (let i = 0; i < MAX_LOG_EVENTS + 50; i++) s.log(`e${i}`)
     const events = useArmStore.getState().events
     expect(events).toHaveLength(MAX_LOG_EVENTS)
-    expect(events[0].text).toBe(`e${MAX_LOG_EVENTS + 49}`) // новые сверху
+    expect(events[0].text).toBe(`e${MAX_LOG_EVENTS + 49}`)
   })
 
   it('сортировка по угрозе: высокая сверху, при равной — ближняя выше; фильтр скрывает уровень', () => {

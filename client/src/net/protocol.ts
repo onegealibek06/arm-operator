@@ -1,8 +1,5 @@
 import type { ServerMessage, Target } from '../types'
 
-// Проверка входящих сообщений. Бэкенд «свой», но пакет может прийти битым или
-// другой версии протокола: такой пакет отбрасываем, а не роняем интерфейс.
-
 const THREATS = new Set(['HIGH', 'MEDIUM', 'LOW'])
 const TYPES = new Set(['UAV', 'FPV', 'HELICOPTER', 'AIRCRAFT', 'UNKNOWN'])
 const STATUSES = new Set(['TRACKING', 'EW_ASSIGNED', 'VIDEO_REQUESTED'])
@@ -18,7 +15,6 @@ export function isTarget(v: unknown): v is Target {
   return NUMERIC.every((k) => isNum(v[k]))
 }
 
-/** null — сообщение не по протоколу. Невалидные цели внутри пакета отбрасываются поштучно. */
 export function parseServerMessage(raw: string): ServerMessage | null {
   let v: unknown
   try {

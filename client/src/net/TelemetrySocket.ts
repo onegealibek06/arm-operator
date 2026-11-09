@@ -2,7 +2,6 @@ import { LINK } from '../config'
 import type { LinkState, ServerMessage } from '../types'
 import { parseServerMessage } from './protocol'
 
-/** hello + хотя бы один пакет телеметрии */
 const ONLINE_AFTER_MESSAGES = 2
 
 interface Handlers {
@@ -11,14 +10,6 @@ interface Handlers {
   onLog: (text: string, level: 'info' | 'warn') => void
 }
 
-/**
- * Обёртка над WebSocket без React: держит одно соединение, сама переподключается
- * и следит за «тишиной». Компоненты её не видят — она пишет в стор через handlers.
- *
- * Почему нужен watchdog: если физически выдернуть Ethernet, браузер ещё долго
- * (минуты) не получит событие close — TCP не знает, что кабеля нет. Поэтому мы
- * сами считаем соединение мёртвым, если данные не приходили deadAfterMs.
- */
 export class TelemetrySocket {
   private readonly url: string
   private readonly handlers: Handlers
@@ -45,21 +36,18 @@ export class TelemetrySocket {
     this.connect()
   }
 
-  /** Отправка JSON. false — если связи нет и сообщение не ушло. */
   send(data: unknown): boolean {
     if (this.ws?.readyState !== WebSocket.OPEN) return false
     this.ws.send(JSON.stringify(data))
     return true
   }
 
-  /** Кнопка «Подключиться сейчас» — не ждать окончания паузы. */
   retryNow(): void {
     if (this.disposed || this.link.status === 'ONLINE') return
     this.attempt = 0
     this.connect()
   }
 
-  /** Полная очистка: таймеры, слушатели, сокет. Вызывается при размонтировании. */
   dispose(): void {
     this.disposed = true
     window.removeEventListener('offline', this.handleBrowserOffline)
@@ -67,8 +55,6 @@ export class TelemetrySocket {
     this.clearTimers()
     this.dropSocket()
   }
-
-  // ---------------------------------------------------------------------------
 
   private connect(): void {
     if (this.disposed) return
@@ -92,8 +78,6 @@ export class TelemetrySocket {
 
     ws.onopen = () => {
       window.clearTimeout(this.connectTimer)
-      // Сокет открыт, но это ещё не «связь есть»: ONLINE — только когда пойдут данные.
-      // Иначе при живом TCP и молчащем сервере мы бы показывали ложный ONLINE.
       this.messagesSinceOpen = 0
       this.lastMessageAt = performance.now()
       this.setLink({ reason: 'канал открыт, ждём данные' })
@@ -101,7 +85,7 @@ export class TelemetrySocket {
     }
 
     ws.onmessage = (event: MessageEvent<string>) => {
-      this.lastMessageAt = performance.now() // канал жив, даже если пакет битый
+      this.lastMessageAt = performance.now()
       const msg = parseServerMessage(event.data)
       if (!msg) {
         this.badPackets += 1
@@ -111,7 +95,7 @@ export class TelemetrySocket {
       }
       this.messagesSinceOpen += 1
       if (this.link.status !== 'ONLINE' && this.messagesSinceOpen >= ONLINE_AFTER_MESSAGES) {
-        this.attempt = 0 // счётчик попыток сбрасываем только при реальном потоке данных
+        this.attempt = 0
         this.setLink({ status: 'ONLINE', attempt: 0, nextRetryAt: null, stale: false, reason: null })
         this.handlers.onLog('Связь с сервером установлена, данные поступают', 'info')
       } else if (this.link.stale) {
@@ -121,12 +105,11 @@ export class TelemetrySocket {
     }
 
     ws.onclose = (event) => {
-      if (this.ws !== ws) return // это закрытие старого сокета, уже не наше
+      if (this.ws !== ws) return
       const wasOnline = this.link.status === 'ONLINE'
       if (wasOnline) this.handlers.onLog(`Соединение закрыто (код ${event.code})`, 'warn')
       this.scheduleRetry(wasOnline ? 'соединение закрыто сервером' : 'сервер недоступен')
     }
-    // onerror не обрабатываем отдельно: за ним всегда следует onclose
   }
 
   private checkSilence = (): void => {
@@ -144,7 +127,6 @@ export class TelemetrySocket {
     if (this.disposed) return
     this.clearTimers()
     this.dropSocket()
-    // Экспонента + случайный разброс, чтобы десятки АРМ не ломились в сервер одновременно
     const exp = Math.min(LINK.retryMaxMs, LINK.retryBaseMs * 2 ** this.attempt)
     const delay = Math.round(exp * (0.8 + Math.random() * 0.4))
     this.attempt += 1
@@ -156,7 +138,6 @@ export class TelemetrySocket {
     const ws = this.ws
     if (!ws) return
     this.ws = null
-    // Отвязываем обработчики, чтобы «мёртвый» сокет не дёрнул нас позже
     ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null
     if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) ws.close()
   }

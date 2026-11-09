@@ -1,26 +1,21 @@
 import type { Target } from '../types'
 
-/**
- * Буфер треков для карты. Живёт вне React: сокет пишет сюда каждый пакет,
- * карта читает каждый кадр (requestAnimationFrame). Так 10–100 пакетов/с
- * не вызывают ни одного ререндера компонентов.
- */
 export interface Track {
-  target: Target // последние данные
-  x: number // последняя измеренная позиция, м
+  target: Target
+  x: number
   y: number
-  vx: number // скорость, м/с (из speed + course)
+  vx: number
   vy: number
-  measuredAt: number // performance.now() приёма пакета
-  dx: number // позиция, которую рисуем (сглаженная), м
+  measuredAt: number
+  dx: number
   dy: number
   trail: { x: number; y: number }[]
   trailAt: number
 }
 
-const MAX_TRAIL = 60 // точек следа (по одной в секунду)
-const MAX_EXTRAPOLATION_MS = 2000 // дольше «додумывать» движение без данных нельзя
-const SMOOTHING_MS = 120 // чем меньше, тем быстрее маркер догоняет расчётную точку
+const MAX_TRAIL = 60
+const MAX_EXTRAPOLATION_MS = 2000
+const SMOOTHING_MS = 120
 
 export const tracks = new Map<string, Track>()
 
@@ -59,22 +54,15 @@ export function ingestTargets(list: Target[], receivedAt: number): void {
       tr.trailAt = receivedAt
     }
   }
-  // Пакет содержит полный список целей: всех, кого нет, удаляем (иначе утечка)
   for (const id of tracks.keys()) if (!seen.has(id)) tracks.delete(id)
 }
 
-/**
- * Плавное движение: 1) предсказываем, где цель сейчас, по последней точке и
- * вектору скорости (между пакетами); 2) экспоненциально подтягиваем рисуемую
- * точку к предсказанной — новый пакет не даёт скачка, а мягко поправляет курс.
- */
 export function advanceTracks(now: number, dtMs: number): void {
   const k = 1 - Math.exp(-dtMs / SMOOTHING_MS)
   for (const tr of tracks.values()) {
     const age = Math.min(now - tr.measuredAt, MAX_EXTRAPOLATION_MS) / 1000
     const px = tr.x + tr.vx * age
     const py = tr.y + tr.vy * age
-    // Большой разрыв (например, после переподключения) — сразу ставим на место
     if (Math.hypot(px - tr.dx, py - tr.dy) > 1500) {
       tr.dx = px
       tr.dy = py

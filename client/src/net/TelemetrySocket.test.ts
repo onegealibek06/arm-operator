@@ -57,7 +57,7 @@ describe('TelemetrySocket', () => {
     expect(link().reason).toBe('нет данных от сервера')
     const before = FakeWebSocket.instances.length
     vi.advanceTimersByTime(LINK.retryMaxMs)
-    expect(FakeWebSocket.instances.length).toBeGreaterThan(before) // новая попытка
+    expect(FakeWebSocket.instances.length).toBeGreaterThan(before)
     sock.dispose()
   })
 

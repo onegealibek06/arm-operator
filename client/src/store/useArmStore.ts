@@ -29,10 +29,8 @@ export interface CommandResult {
 
 interface ArmState {
   link: LinkState
-  /** Цели, нормализованные по id: обновление одной не трогает остальные. */
   targets: Record<string, Target>
   targetIds: string[]
-  /** Цели, пропавшие из потока, пока оператор их смотрел. */
   lostTargets: Record<string, { target: Target; lostAt: number }>
   lastPacketAt: number | null
   packetsPerSec: number
@@ -43,10 +41,9 @@ interface ArmState {
   sort: { key: SortKey; dir: 'asc' | 'desc' }
 
   pending: Record<string, PendingCommand>
-  lastResult: Record<string, CommandResult> // по targetId
+  lastResult: Record<string, CommandResult>
   events: LogEvent[]
 
-  // actions
   setLink: (link: LinkState) => void
   applySnapshot: (targets: Target[], meta: { lastPacketAt: number; packetsPerSec: number }) => void
   setScene: (scene: { rangeM: number; zoneM: number }) => void
@@ -88,8 +85,6 @@ export const useArmStore = create<ArmState>()((set, get) => ({
     const logs: [string, LogLevel][] = []
 
     for (const t of list) {
-      // Если данные цели не изменились, оставляем старый объект: строка таблицы
-      // (React.memo) тогда не перерисуется.
       const old = prev[t.id]
       next[t.id] = old && sameTarget(old, t) ? old : t
       if (!old) {
@@ -109,13 +104,11 @@ export const useArmStore = create<ArmState>()((set, get) => ({
       if (id === selectedId) lost = { ...lost, [id]: { target: prev[id], lostAt: Date.now() } }
     }
 
-    // результаты команд храним только по живым (или выбранной) целям, иначе за смену словарь растёт
     let results = lastResult
     if (Object.keys(lastResult).some((id) => !next[id] && id !== selectedId)) {
       results = Object.fromEntries(Object.entries(lastResult).filter(([id]) => next[id] || id === selectedId))
     }
 
-    // одно обновление стора на пакет, а не по одному на каждое событие журнала
     set((s) => ({
       targets: next,
       targetIds: list.map((t) => t.id),
@@ -127,7 +120,6 @@ export const useArmStore = create<ArmState>()((set, get) => ({
     }))
   },
 
-  // Выбор другой цели забывает «потерянные», чтобы словарь не рос бесконечно
   select: (id) => set({ selectedId: id, lostTargets: {} }),
 
   toggleThreat: (level) => set((s) => ({ threatFilter: { ...s.threatFilter, [level]: !s.threatFilter[level] } })),
@@ -154,7 +146,6 @@ export const useArmStore = create<ArmState>()((set, get) => ({
   log: (text, level = 'info') => set((s) => ({ events: appendEvents(s.events, [[text, level]]) })),
 }))
 
-// журнал ограничен MAX_LOG_EVENTS записями, иначе за смену он съест память
 function appendEvents(events: LogEvent[], items: [string, LogLevel][]): LogEvent[] {
   const ts = Date.now()
   const fresh = items.map(([text, level]) => ({ id: ++eventId, ts, level, text })).reverse()
@@ -175,7 +166,6 @@ function sameTarget(a: Target, b: Target): boolean {
 
 export const THREAT_ORDER: Record<ThreatLevel, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 }
 
-/** Видимые в таблице цели: фильтр по угрозе + сортировка. */
 export function selectVisibleTargets(s: Pick<ArmState, 'targets' | 'targetIds' | 'threatFilter' | 'sort'>): Target[] {
   const list = s.targetIds.map((id) => s.targets[id]).filter((t) => t && s.threatFilter[t.threat])
   const { key, dir } = s.sort

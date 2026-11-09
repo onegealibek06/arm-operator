@@ -4,16 +4,6 @@ import { useArmStore } from '../store/useArmStore'
 import type { CommandAction, CommandMessage, ServerMessage, Target } from '../types'
 import { TelemetrySocket } from './TelemetrySocket'
 
-/**
- * «Мост» между сокетом и интерфейсом.
- *
- * Поток данных:
- *   сокет → (каждый пакет) → trackBuffer → карта рисует каждый кадр
- *         → (только последний пакет) → раз в 250 мс → Zustand → таблица/карточка
- *
- * Сколько бы пакетов в секунду ни пришло, React обновляется не чаще 4 раз в секунду.
- */
-
 let socket: TelemetrySocket | null = null
 let flushTimer: number | undefined
 let latest: Target[] | null = null
@@ -36,14 +26,14 @@ const ACTION_LABEL: Record<CommandAction, string> = {
 function onMessage(msg: ServerMessage): void {
   switch (msg.type) {
     case 'hello':
-      lastSeq = -1 // новое соединение — нумерация может начаться заново
+      lastSeq = -1
       store().setScene({ rangeM: msg.rangeM, zoneM: msg.zoneM })
       break
     case 'telemetry':
-      if (msg.seq <= lastSeq) return // дубль или пакет, пришедший позже более свежего
+      if (msg.seq <= lastSeq) return
       lastSeq = msg.seq
       ingestTargets(msg.targets, performance.now())
-      latest = msg.targets // старые непоказанные пакеты просто выбрасываем
+      latest = msg.targets
       lastPacketAt = Date.now()
       packetsInWindow += 1
       break
@@ -52,7 +42,6 @@ function onMessage(msg: ServerMessage): void {
       ackTimers.delete(msg.requestId)
       store().resolvePending(msg.requestId, { action: msg.action, ok: msg.ok, message: msg.message, ts: Date.now() })
       store().log(msg.ok ? msg.message : `Отказ: ${msg.message}`, msg.ok ? 'cmd' : 'error')
-      // Оператор сам сбросил цель — закрываем карточку, а не показываем «цель потеряна»
       if (msg.ok && msg.action === 'DROP_TARGET' && store().selectedId === msg.targetId) store().select(null)
       break
     }
@@ -70,17 +59,15 @@ function flush(): void {
     store().applySnapshot(latest, { lastPacketAt, packetsPerSec })
     latest = null
   } else if (store().packetsPerSec !== packetsPerSec) {
-    // данные не идут — всё равно обновим счётчик, чтобы оператор видел «0 пак/с»
     useArmStore.setState({ packetsPerSec })
   }
 }
 
-/** Запуск соединения. Возвращает функцию полной очистки (для useEffect). */
 export function startConnection(): () => void {
   socket = new TelemetrySocket(WS_URL, {
     onMessage,
     onLinkChange: (link) => {
-      if (link.status !== 'ONLINE') lastSeq = -1 // сервер мог перезапуститься и начать нумерацию с 1
+      if (link.status !== 'ONLINE') lastSeq = -1
       store().setLink(link)
     },
     onLog: (text, level) => store().log(text, level),
@@ -105,9 +92,7 @@ export function retryNow(): void {
   socket?.retryNow()
 }
 
-/** Отправка команды оператора. Ответ (ack) придёт асинхронно и найдётся по requestId. */
 export function sendCommand(action: CommandAction, targetId: string): boolean {
-  // crypto.randomUUID недоступен по http в локальной сети (не secure context), поэтому свой id
   const requestId = `${Date.now().toString(36)}-${++requestCounter}`
   const msg: CommandMessage = { type: 'command', requestId, action, targetId, ts: Date.now() }
 

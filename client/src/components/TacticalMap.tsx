@@ -10,18 +10,16 @@ const COLORS: Record<ThreatLevel, string> = { HIGH: '#ff4d4f', MEDIUM: '#f5a524'
 const ACCENT = '#3d9cf5'
 const FONT = '"Inter Variable", -apple-system, "Segoe UI", Roboto, sans-serif'
 const HIT_RADIUS_PX = 18
-const VECTOR_SECONDS = 60 // вектор движения: где цель будет через минуту
+const VECTOR_SECONDS = 60
 const SWEEP_PERIOD_MS = 4000
 
 interface View {
   cx: number
   cy: number
-  scale: number // пикселей на метр
+  scale: number
   w: number
 }
 
-// Canvas рендерится React один раз, дальше всё рисует цикл requestAnimationFrame
-// по данным из trackBuffer — без ререндеров компонентов.
 export function TacticalMap() {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -129,7 +127,6 @@ function Legend() {
   )
 }
 
-// предупреждение поверх карты: данные задерживаются или связи нет
 function LinkOverlay() {
   const link = useArmStore((s) => s.link)
   const lastPacketAt = useArmStore((s) => s.lastPacketAt)
@@ -170,8 +167,6 @@ function LinkOverlay() {
   )
 }
 
-// --- рисование ---
-
 function draw(ctx: CanvasRenderingContext2D, w: number, h: number, now: number, hoverId: string | null): View {
   const { scene, selectedId } = useArmStore.getState()
   const cx = w / 2
@@ -184,7 +179,6 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, now: number, 
   drawSweep(ctx, cx, cy, radius, now)
   drawGrid(ctx, cx, cy, radius, scale, scene.rangeM, scene.zoneM)
 
-  // выбранная цель рисуется последней, поверх остальных
   const order: Record<ThreatLevel, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 }
   const list = [...tracks.values()].sort(
     (a, b) =>
@@ -216,7 +210,6 @@ function drawGrid(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius:
   ctx.textBaseline = 'middle'
   ctx.lineWidth = 1
 
-  // кольца дальности через 2 км
   for (let m = 2000; m <= rangeM; m += 2000) {
     const r = m * scale
     ctx.beginPath()
@@ -228,7 +221,6 @@ function drawGrid(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius:
     ctx.fillText(m === rangeM ? `${m / 1000} км` : String(m / 1000), cx + r * Math.SQRT1_2 + 10, cy - r * Math.SQRT1_2 - 6)
   }
 
-  // перекрестие
   ctx.setLineDash([2, 6])
   ctx.strokeStyle = '#232a33'
   ctx.beginPath()
@@ -239,7 +231,6 @@ function drawGrid(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius:
   ctx.stroke()
   ctx.setLineDash([])
 
-  // риски азимута каждые 10°, подписи каждые 30°
   for (let a = 0; a < 360; a += 10) {
     const rad = (a * Math.PI) / 180
     const sin = Math.sin(rad)
@@ -258,7 +249,6 @@ function drawGrid(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius:
     }
   }
 
-  // охраняемая зона
   const zr = zoneM * scale
   ctx.beginPath()
   ctx.arc(cx, cy, zr, 0, Math.PI * 2)
@@ -272,7 +262,6 @@ function drawGrid(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius:
   ctx.fillStyle = 'rgba(255, 120, 122, 0.85)'
   ctx.fillText('охраняемая зона', cx, cy - zr - 9)
 
-  // КП
   ctx.beginPath()
   ctx.arc(cx, cy, 9, 0, Math.PI * 2)
   ctx.fillStyle = 'rgba(61, 156, 245, 0.15)'
@@ -338,7 +327,6 @@ function drawTrack(ctx: CanvasRenderingContext2D, tr: Track, v: View, now: numbe
 
   ctx.save()
 
-  // след: точки, которые бледнеют к началу
   const n = tr.trail.length
   tr.trail.forEach((p, i) => {
     ctx.globalAlpha = alpha * (0.1 + (0.5 * i) / Math.max(1, n))
@@ -348,7 +336,6 @@ function drawTrack(ctx: CanvasRenderingContext2D, tr: Track, v: View, now: numbe
     ctx.fill()
   })
 
-  // вектор движения
   ctx.globalAlpha = alpha * 0.75
   ctx.beginPath()
   ctx.moveTo(sx, sy)
@@ -359,7 +346,6 @@ function drawTrack(ctx: CanvasRenderingContext2D, tr: Track, v: View, now: numbe
 
   ctx.globalAlpha = alpha
 
-  // выбранная цель: пульсирующее кольцо
   if (selected) {
     const p = (now % 1500) / 1500
     ctx.beginPath()
@@ -391,7 +377,6 @@ function drawTrack(ctx: CanvasRenderingContext2D, tr: Track, v: View, now: numbe
 
   drawMarker(ctx, t.threat, sx, sy)
 
-  // подпись-плашка
   const line1 = t.id
   const line2 = `${(t.distance / 1000).toFixed(1)} км  ${t.altitude} м`
   ctx.font = `600 12px ${FONT}`
@@ -400,7 +385,6 @@ function drawTrack(ctx: CanvasRenderingContext2D, tr: Track, v: View, now: numbe
   const w2 = ctx.measureText(line2).width
   const bw = Math.max(w1, w2) + 14
   const bh = 34
-  // у правого края подпись уходит влево от маркера, чтобы не обрезалась
   const bx = sx + 16 + bw > v.w - 4 ? sx - 16 - bw : sx + 16
   const by = Math.max(4, sy - bh - 6)
   roundRect(ctx, bx, by, bw, bh, 5)

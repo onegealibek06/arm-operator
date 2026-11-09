@@ -8,7 +8,6 @@ import { useKeyboard } from './hooks/useKeyboard'
 import { startConnection } from './net/connection'
 
 export default function App() {
-  // Одно соединение на всё приложение. Функция очистки закрывает сокет и все таймеры.
   useEffect(() => startConnection(), [])
   useKeyboard()
 

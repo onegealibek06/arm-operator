@@ -1,4 +1,3 @@
-// Подменный WebSocket для тестов: позволяет «открыть», «прислать пакет» и «оборвать» соединение вручную.
 export class FakeWebSocket {
   static readonly CONNECTING = 0
   static readonly OPEN = 1
@@ -31,7 +30,6 @@ export class FakeWebSocket {
     this.readyState = FakeWebSocket.CLOSED
   }
 
-  // --- управление из теста ---
   open() {
     this.readyState = FakeWebSocket.OPEN
     this.onopen?.({})
