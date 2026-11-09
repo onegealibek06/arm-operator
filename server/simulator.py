@@ -194,6 +194,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="ARM telemetry simulator", lifespan=lifespan)
 world = World()
 clients: set[WebSocket] = set()
+background: set[asyncio.Task] = set()  # держим ссылки, иначе GC может удалить задачу до завершения
 settings = {"hz": 10.0, "stall_until": 0.0}
 seq = itertools.count(1)
 
@@ -203,7 +204,8 @@ async def broadcast(message: dict) -> None:
     dead = []
     for ws in list(clients):
         try:
-            await ws.send_text(data)
+            # зависший клиент не должен тормозить рассылку остальным
+            await asyncio.wait_for(ws.send_text(data), timeout=1.0)
         except Exception:
             dead.append(ws)
     for ws in dead:
@@ -252,8 +254,10 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
                 continue
-            if msg.get("type") == "command":
-                asyncio.create_task(handle_command(ws, msg))
+            if isinstance(msg, dict) and msg.get("type") == "command":
+                task = asyncio.create_task(handle_command(ws, msg))
+                background.add(task)
+                task.add_done_callback(background.discard)
     except WebSocketDisconnect:
         pass
     finally:

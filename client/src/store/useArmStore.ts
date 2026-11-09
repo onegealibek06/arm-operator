@@ -83,40 +83,48 @@ export const useArmStore = create<ArmState>()((set, get) => ({
   setScene: (scene) => set({ scene }),
 
   applySnapshot: (list, meta) => {
-    const prev = get().targets
+    const { targets: prev, selectedId, lostTargets, lastResult } = get()
     const next: Record<string, Target> = {}
+    const logs: [string, LogLevel][] = []
+
     for (const t of list) {
-      // Сохраняем ссылку на старый объект, если ничего не поменялось, — тогда
-      // строка таблицы (React.memo) не перерисуется.
+      // Если данные цели не изменились, оставляем старый объект: строка таблицы
+      // (React.memo) тогда не перерисуется.
       const old = prev[t.id]
       next[t.id] = old && sameTarget(old, t) ? old : t
-
       if (!old) {
-        get().log(
+        logs.push([
           `Обнаружена цель ${t.id} (${TYPE_LABEL[t.type]}), дальность ${(t.distance / 1000).toFixed(1)} км, угроза ${THREAT_LABEL[t.threat]}`,
           t.threat === 'HIGH' ? 'alert' : 'info',
-        )
+        ])
       } else if (old.threat !== t.threat && t.threat === 'HIGH') {
-        get().log(`Угроза ${t.id} повышена до высокой (${(t.distance / 1000).toFixed(1)} км)`, 'alert')
+        logs.push([`Угроза ${t.id} повышена до высокой (${(t.distance / 1000).toFixed(1)} км)`, 'alert'])
       }
     }
 
-    const { selectedId, lostTargets } = get()
     let lost = lostTargets
     for (const id of Object.keys(prev)) {
-      if (!next[id]) {
-        get().log(`Цель ${id} пропала с сопровождения`, 'warn')
-        if (id === selectedId) lost = { ...lost, [id]: { target: prev[id], lostAt: Date.now() } }
-      }
+      if (next[id]) continue
+      logs.push([`Цель ${id} пропала с сопровождения`, 'warn'])
+      if (id === selectedId) lost = { ...lost, [id]: { target: prev[id], lostAt: Date.now() } }
     }
 
-    set({
+    // результаты команд храним только по живым (или выбранной) целям, иначе за смену словарь растёт
+    let results = lastResult
+    if (Object.keys(lastResult).some((id) => !next[id] && id !== selectedId)) {
+      results = Object.fromEntries(Object.entries(lastResult).filter(([id]) => next[id] || id === selectedId))
+    }
+
+    // одно обновление стора на пакет, а не по одному на каждое событие журнала
+    set((s) => ({
       targets: next,
       targetIds: list.map((t) => t.id),
       lostTargets: lost,
+      lastResult: results,
       lastPacketAt: meta.lastPacketAt,
       packetsPerSec: meta.packetsPerSec,
-    })
+      events: logs.length ? appendEvents(s.events, logs) : s.events,
+    }))
   },
 
   // Выбор другой цели забывает «потерянные», чтобы словарь не рос бесконечно
@@ -143,12 +151,15 @@ export const useArmStore = create<ArmState>()((set, get) => ({
       }
     }),
 
-  log: (text, level = 'info') =>
-    set((s) => ({
-      // Ограничиваем журнал, иначе за смену он съест память
-      events: [{ id: ++eventId, ts: Date.now(), level, text }, ...s.events].slice(0, MAX_LOG_EVENTS),
-    })),
+  log: (text, level = 'info') => set((s) => ({ events: appendEvents(s.events, [[text, level]]) })),
 }))
+
+// журнал ограничен MAX_LOG_EVENTS записями, иначе за смену он съест память
+function appendEvents(events: LogEvent[], items: [string, LogLevel][]): LogEvent[] {
+  const ts = Date.now()
+  const fresh = items.map(([text, level]) => ({ id: ++eventId, ts, level, text })).reverse()
+  return [...fresh, ...events].slice(0, MAX_LOG_EVENTS)
+}
 
 function sameTarget(a: Target, b: Target): boolean {
   return (

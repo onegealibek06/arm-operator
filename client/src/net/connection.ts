@@ -22,6 +22,7 @@ let packetsInWindow = 0
 let windowStart = 0
 let packetsPerSec = 0
 let requestCounter = 0
+let lastSeq = -1
 const ackTimers = new Map<string, number>()
 
 const store = () => useArmStore.getState()
@@ -35,9 +36,12 @@ const ACTION_LABEL: Record<CommandAction, string> = {
 function onMessage(msg: ServerMessage): void {
   switch (msg.type) {
     case 'hello':
+      lastSeq = -1 // новое соединение — нумерация может начаться заново
       store().setScene({ rangeM: msg.rangeM, zoneM: msg.zoneM })
       break
     case 'telemetry':
+      if (msg.seq <= lastSeq) return // дубль или пакет, пришедший позже более свежего
+      lastSeq = msg.seq
       ingestTargets(msg.targets, performance.now())
       latest = msg.targets // старые непоказанные пакеты просто выбрасываем
       lastPacketAt = Date.now()
@@ -75,7 +79,10 @@ function flush(): void {
 export function startConnection(): () => void {
   socket = new TelemetrySocket(WS_URL, {
     onMessage,
-    onLinkChange: (link) => store().setLink(link),
+    onLinkChange: (link) => {
+      if (link.status !== 'ONLINE') lastSeq = -1 // сервер мог перезапуститься и начать нумерацию с 1
+      store().setLink(link)
+    },
     onLog: (text, level) => store().log(text, level),
   })
   socket.start()
@@ -90,6 +97,7 @@ export function startConnection(): () => void {
     ackTimers.clear()
     tracks.clear()
     latest = null
+    lastSeq = -1
   }
 }
 

@@ -1,5 +1,6 @@
 import { LINK } from '../config'
 import type { LinkState, ServerMessage } from '../types'
+import { parseServerMessage } from './protocol'
 
 /** hello + хотя бы один пакет телеметрии */
 const ONLINE_AFTER_MESSAGES = 2
@@ -25,6 +26,7 @@ export class TelemetrySocket {
   private attempt = 0
   private lastMessageAt = 0
   private messagesSinceOpen = 0
+  private badPackets = 0
   private disposed = false
   private link: LinkState = { status: 'RECONNECTING', attempt: 0, nextRetryAt: null, stale: false, reason: null }
 
@@ -99,7 +101,14 @@ export class TelemetrySocket {
     }
 
     ws.onmessage = (event: MessageEvent<string>) => {
-      this.lastMessageAt = performance.now()
+      this.lastMessageAt = performance.now() // канал жив, даже если пакет битый
+      const msg = parseServerMessage(event.data)
+      if (!msg) {
+        this.badPackets += 1
+        if (this.badPackets === 1 || this.badPackets % 100 === 0)
+          this.handlers.onLog(`Отброшен некорректный пакет (всего ${this.badPackets})`, 'warn')
+        return
+      }
       this.messagesSinceOpen += 1
       if (this.link.status !== 'ONLINE' && this.messagesSinceOpen >= ONLINE_AFTER_MESSAGES) {
         this.attempt = 0 // счётчик попыток сбрасываем только при реальном потоке данных
@@ -107,12 +116,6 @@ export class TelemetrySocket {
         this.handlers.onLog('Связь с сервером установлена, данные поступают', 'info')
       } else if (this.link.stale) {
         this.setLink({ stale: false })
-      }
-      let msg: ServerMessage
-      try {
-        msg = JSON.parse(event.data) as ServerMessage
-      } catch {
-        return // битый пакет пропускаем, соединение не рвём
       }
       this.handlers.onMessage(msg)
     }

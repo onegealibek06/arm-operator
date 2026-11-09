@@ -8,9 +8,8 @@ import { IconSort } from './icons'
 const COLUMNS: { key: SortKey | null; label: string; right?: boolean; className?: string }[] = [
   { key: 'id', label: 'Цель' },
   { key: 'threat', label: 'Угроза' },
-  { key: null, label: 'Координаты', className: 'col-coords' },
-  { key: 'distance', label: 'Дальность', right: true },
-  { key: 'azimuth', label: 'Азимут', right: true },
+  { key: null, label: 'Координаты' },
+  { key: 'distance', label: 'Азимут, дальн.', right: true },
   { key: 'speed', label: 'Скорость', right: true },
 ]
 
@@ -109,17 +108,13 @@ const Row = memo(function Row({ t, selected, onSelect }: { t: Target; selected: 
       <td>
         <span className={`chip chip--${t.threat}`}>{THREAT_LABEL[t.threat]}</span>
       </td>
-      <td className="num col-coords">
+      <td className="num">
         {t.lat.toFixed(4)}
         <span className="sub">{t.lon.toFixed(4)}</span>
       </td>
-      <td className="num r">
-        {km(t.distance)}
-        <span className="sub">км</span>
-      </td>
-      <td className="num r">
+      <td className="num r" title="Азимут и дальность от КП">
         {deg(t.azimuth)}
-        <span className="sub">{t.altitude} м</span>
+        <span className="sub">{km(t.distance)} км</span>
       </td>
       <td className="num r">
         {t.speed.toFixed(0)}
