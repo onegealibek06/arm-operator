@@ -5,13 +5,15 @@ export function EventLog() {
   const events = useArmStore((s) => s.events)
   return (
     <section className="panel log-panel" aria-label="Журнал событий">
-      <div className="panel-title">
-        Журнал событий <span className="num">{events.length}</span>
+      <div className="panel-head">
+        <h2>Журнал событий</h2>
+        <span className="count num">{events.length}</span>
       </div>
-      <ol className="log num" aria-live="polite">
+      <ol className="log" aria-live="polite">
         {events.map((e) => (
           <li key={e.id} className={`lvl-${e.level}`}>
-            <time>{clock(e.ts)}</time>
+            <time className="num">{clock(e.ts)}</time>
+            <i aria-hidden />
             <span>{e.text}</span>
           </li>
         ))}

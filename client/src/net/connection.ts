@@ -47,7 +47,7 @@ function onMessage(msg: ServerMessage): void {
       window.clearTimeout(ackTimers.get(msg.requestId))
       ackTimers.delete(msg.requestId)
       store().resolvePending(msg.requestId, { action: msg.action, ok: msg.ok, message: msg.message, ts: Date.now() })
-      store().log(`${msg.ok ? '✔' : '✖'} ${msg.message}`, msg.ok ? 'cmd' : 'error')
+      store().log(msg.ok ? msg.message : `Отказ: ${msg.message}`, msg.ok ? 'cmd' : 'error')
       // Оператор сам сбросил цель — закрываем карточку, а не показываем «цель потеряна»
       if (msg.ok && msg.action === 'DROP_TARGET' && store().selectedId === msg.targetId) store().select(null)
       break
@@ -104,12 +104,12 @@ export function sendCommand(action: CommandAction, targetId: string): boolean {
   const msg: CommandMessage = { type: 'command', requestId, action, targetId, ts: Date.now() }
 
   if (!socket?.send(msg)) {
-    store().log(`Нет связи — команда «${ACTION_LABEL[action]}» по ${targetId} не отправлена`, 'error')
+    store().log(`Нет связи, команда "${ACTION_LABEL[action]}" (${targetId}) не отправлена`, 'error')
     return false
   }
 
   store().addPending({ requestId, action, targetId, sentAt: Date.now() })
-  store().log(`→ ${ACTION_LABEL[action]}: ${targetId}`, 'cmd')
+  store().log(`Команда: ${ACTION_LABEL[action]} (${targetId})`, 'cmd')
 
   ackTimers.set(
     requestId,
@@ -121,7 +121,7 @@ export function sendCommand(action: CommandAction, targetId: string): boolean {
         message: 'Нет подтверждения от сервера',
         ts: Date.now(),
       })
-      store().log(`✖ «${ACTION_LABEL[action]}» по ${targetId}: нет подтверждения за ${COMMAND_ACK_TIMEOUT_MS / 1000} с`, 'error')
+      store().log(`Нет подтверждения за ${COMMAND_ACK_TIMEOUT_MS / 1000} с: ${ACTION_LABEL[action]} (${targetId})`, 'error')
     }, COMMAND_ACK_TIMEOUT_MS),
   )
   return true

@@ -58,7 +58,7 @@ interface ArmState {
   log: (text: string, level?: LogLevel) => void
 }
 
-const THREAT_LABEL: Record<ThreatLevel, string> = { HIGH: 'ВЫСОКАЯ', MEDIUM: 'СРЕДНЯЯ', LOW: 'НИЗКАЯ' }
+const THREAT_LABEL: Record<ThreatLevel, string> = { HIGH: 'высокая', MEDIUM: 'средняя', LOW: 'низкая' }
 let eventId = 0
 
 export const useArmStore = create<ArmState>()((set, get) => ({
@@ -97,7 +97,7 @@ export const useArmStore = create<ArmState>()((set, get) => ({
           t.threat === 'HIGH' ? 'alert' : 'info',
         )
       } else if (old.threat !== t.threat && t.threat === 'HIGH') {
-        get().log(`Угроза ${t.id} повышена до ВЫСОКОЙ (${(t.distance / 1000).toFixed(1)} км)`, 'alert')
+        get().log(`Угроза ${t.id} повышена до высокой (${(t.distance / 1000).toFixed(1)} км)`, 'alert')
       }
     }
 

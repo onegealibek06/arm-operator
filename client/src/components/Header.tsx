@@ -1,8 +1,13 @@
+import type { CSSProperties } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useNow } from '../hooks/useNow'
-import { clock } from '../labels'
+import { clock, THREAT_LABEL } from '../labels'
 import { retryNow } from '../net/connection'
 import { useArmStore } from '../store/useArmStore'
+import type { ThreatLevel } from '../types'
+import { IconAlert, Logo } from './icons'
+
+const COUNTER_COLOR: Record<ThreatLevel, string> = { HIGH: 'var(--high)', MEDIUM: 'var(--med)', LOW: 'var(--low)' }
 
 export function Header() {
   const now = useNow(500)
@@ -18,63 +23,75 @@ export function Header() {
   )
 
   let mod = 'online'
-  let label = 'ONLINE'
   let detail = 'связь в норме'
   if (link.status === 'ONLINE' && link.stale) {
     mod = 'stale'
     detail = lastPacketAt ? `нет данных ${((now - lastPacketAt) / 1000).toFixed(1)} с` : 'ожидание данных'
   } else if (link.status === 'RECONNECTING') {
     mod = 'reconnecting'
-    label = 'RECONNECTING'
-    detail = link.attempt > 0 ? `попытка ${link.attempt + 1}` : 'подключение…'
+    detail = link.attempt > 0 ? `попытка ${link.attempt + 1}` : 'подключение'
   } else if (link.status === 'OFFLINE') {
     mod = 'offline'
-    label = 'OFFLINE'
     const left = link.nextRetryAt ? Math.max(0, Math.ceil((link.nextRetryAt - now) / 1000)) : 0
-    detail = `${link.reason ?? 'нет связи'} · повтор через ${left} с`
+    detail = `повтор через ${left} с`
   }
 
-  // now тикает раз в 500 мс, а пакет мог прийти позже — без max время уходило в минус
-  const age = lastPacketAt ? (Math.max(0, now - lastPacketAt) / 1000).toFixed(1) : '—'
+  const age = lastPacketAt ? (Math.max(0, now - lastPacketAt) / 1000).toFixed(1) : '-'
 
   return (
     <header className="header">
       <div className="brand">
-        АРМ ОПЕРАТОРА · КП
-        <small>Воздушная обстановка</small>
+        <Logo />
+        <div>
+          <div className="brand-name">АРМ оператора</div>
+          <div className="brand-sub">Командный пункт, воздушная обстановка</div>
+        </div>
       </div>
 
-      <div className={`link link--${mod}`} role="status" aria-live="polite">
-        <span className="dot" aria-hidden />
-        <span>{label}</span>
-        <small>{detail}</small>
+      <div className={`status status--${mod}`} role="status" aria-live="polite" title={link.reason ?? undefined}>
+        <span className="bars" aria-hidden>
+          <i />
+          <i />
+          <i />
+        </span>
+        <span className="status-label">{link.status}</span>
+        <span className="status-detail num">{detail}</span>
         {link.status === 'OFFLINE' && (
-          <button className="btn" style={{ padding: '2px 8px', fontSize: 12 }} onClick={retryNow}>
-            Сейчас
+          <button className="btn-link" onClick={retryNow}>
+            Переподключить
           </button>
         )}
       </div>
 
-      <div className="metrics num">
+      <div className="stats num">
         <span>
           Поток <b>{packetsPerSec}</b> пак/с
         </span>
-        <span className="hide-sm">
+        <span className="hide-sm hide-md">
           Последний пакет <b>{age}</b> с
-        </span>
-        <span>
-          Цели <b style={{ color: 'var(--danger)' }}>{counts.HIGH}</b> / <b style={{ color: 'var(--warn)' }}>{counts.MEDIUM}</b> /{' '}
-          <b>{counts.LOW}</b>
         </span>
       </div>
 
       <span className="spacer" />
-      <span className="clock num">{clock(now)}</span>
+
+      <div className="threat-counters num" aria-label="Цели по уровню угрозы">
+        {(['HIGH', 'MEDIUM', 'LOW'] as const).map((l) => (
+          <div
+            key={l}
+            className={`counter${counts[l] > 0 && l !== 'LOW' ? ' is-hot' : ''}`}
+            style={{ '--c': COUNTER_COLOR[l] } as CSSProperties}
+          >
+            <b>{counts[l]}</b>
+            {THREAT_LABEL[l].toLowerCase()}
+          </div>
+        ))}
+      </div>
+
+      <span className="clock num hide-sm">{clock(now)}</span>
     </header>
   )
 }
 
-/** Баннер тревоги: цель высокой угрозы внутри охраняемой зоны. */
 export function AlarmBanner() {
   const intruders = useArmStore(
     useShallow((s) => s.targetIds.filter((id) => s.targets[id].threat === 'HIGH' && s.targets[id].distance < s.scene.zoneM)),
@@ -82,7 +99,8 @@ export function AlarmBanner() {
   if (intruders.length === 0) return <div />
   return (
     <div className="alarm" role="alert">
-      ⚠ ВТОРЖЕНИЕ В ОХРАНЯЕМУЮ ЗОНУ: {intruders.join(', ')}
+      <IconAlert />
+      Вторжение в охраняемую зону: {intruders.join(', ')}
     </div>
   )
 }

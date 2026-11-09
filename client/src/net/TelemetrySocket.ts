@@ -130,7 +130,7 @@ export class TelemetrySocket {
     const silence = performance.now() - this.lastMessageAt
     if (silence > LINK.deadAfterMs) {
       if (this.link.status === 'ONLINE')
-        this.handlers.onLog(`Нет данных ${(silence / 1000).toFixed(1)} с — связь считается потерянной`, 'warn')
+        this.handlers.onLog(`Нет данных ${(silence / 1000).toFixed(1)} с, связь потеряна`, 'warn')
       this.scheduleRetry('нет данных от сервера')
     } else if (silence > LINK.staleAfterMs && !this.link.stale) {
       this.setLink({ stale: true })

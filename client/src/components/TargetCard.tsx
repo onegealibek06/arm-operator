@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { clock, deg, km, STATUS_LABEL, THREAT_LABEL, TYPE_LABEL } from '../labels'
 import { ACTION_LABEL, sendCommand } from '../net/connection'
 import { useArmStore } from '../store/useArmStore'
 import type { CommandAction } from '../types'
+import { IconClose, IconDrop, IconJam, IconVideo } from './icons'
 
-/** Команды, которые нельзя выполнить одним случайным кликом — оператор подтверждает. */
+// эти команды выполняются только после подтверждения оператора
 const NEEDS_CONFIRM: Record<CommandAction, boolean> = {
   EW_HANDOFF: true,
   REQUEST_VIDEO: false,
@@ -25,7 +26,8 @@ export function TargetCard() {
     ),
   )
   const result = useArmStore((s) => (s.selectedId ? s.lastResult[s.selectedId] : undefined))
-  // Запоминаем, к какой цели относится подтверждение: сменили цель — оно само «исчезает»
+
+  // подтверждение привязано к цели: выбрали другую - оно пропадает само
   const [confirm, setConfirm] = useState<{ action: CommandAction; targetId: string } | null>(null)
   const confirming = confirm && confirm.targetId === selectedId ? confirm.action : null
   const setConfirming = (action: CommandAction | null) =>
@@ -33,9 +35,11 @@ export function TargetCard() {
 
   if (!selectedId) {
     return (
-      <section className="panel card-panel" aria-label="Карточка цели">
-        <div className="panel-title">Карточка цели</div>
-        <div className="empty">Выберите цель в таблице или на карте (↑ ↓ — переключение)</div>
+      <section className="panel card-panel" aria-label="Выбранная цель">
+        <div className="panel-head">
+          <h2>Выбранная цель</h2>
+        </div>
+        <div className="empty">Выберите цель в списке или на карте. Стрелки вверх и вниз переключают цели.</div>
       </section>
     )
   }
@@ -55,42 +59,56 @@ export function TargetCard() {
   const disabled = (a: CommandAction) =>
     !online || !target || pendingActions.includes(a) || (a === 'EW_HANDOFF' && target.status === 'EW_ASSIGNED')
 
+  const label = (a: CommandAction) => (pendingActions.includes(a) ? 'Отправка...' : ACTION_LABEL[a])
+
   return (
-    <section className="panel card-panel" aria-label={`Карточка цели ${shown.id}`}>
-      <div className="panel-title">Карточка цели</div>
+    <section className="panel card-panel" aria-label={`Выбранная цель ${shown.id}`}>
+      <div className="panel-head">
+        <h2>Выбранная цель</h2>
+      </div>
       <div className="card-body">
         <div className="card-head">
-          <h2 className="num">{shown.id}</h2>
-          <span className="type">{TYPE_LABEL[shown.type]}</span>
-          <span className={`threat threat--${shown.threat}`}>{THREAT_LABEL[shown.threat]}</span>
-          <button className="close" aria-label="Закрыть карточку" onClick={() => useArmStore.getState().select(null)}>
-            ✕
+          <span className="ident num">{shown.id}</span>
+          <span className="type">
+            {TYPE_LABEL[shown.type]}
+            {shown.status !== 'TRACKING' && `, ${STATUS_LABEL[shown.status].toLowerCase()}`}
+          </span>
+          <span className={`chip chip--${shown.threat}`}>{THREAT_LABEL[shown.threat]}</span>
+          <button className="icon-btn" aria-label="Снять выбор" title="Снять выбор (Esc)" onClick={() => useArmStore.getState().select(null)}>
+            <IconClose />
           </button>
         </div>
 
-        {lost && !target && <div className="lost">Цель потеряна в {clock(lost.lostAt)} — показаны последние данные</div>}
+        {lost && !target && <div className="note note--warn">Цель потеряна в {clock(lost.lostAt)}, показаны последние данные</div>}
 
         <dl className="facts num">
-          <Fact label="Дальность, км" value={km(shown.distance)} />
-          <Fact label="Азимут" value={deg(shown.azimuth)} />
-          <Fact label="Курс" value={deg(shown.course)} />
-          <Fact label="Скорость" value={`${shown.speed.toFixed(0)} м/с`} />
-          <Fact label="Высота" value={`${shown.altitude} м`} />
-          <Fact label="Статус" value={STATUS_LABEL[shown.status]} />
-          <Fact label="X / Y, км" value={`${km(shown.x)} / ${km(shown.y)}`} />
-          <Fact label="Широта" value={shown.lat.toFixed(5)} />
-          <Fact label="Долгота" value={shown.lon.toFixed(5)} />
+          <Fact label="Дальность">
+            {km(shown.distance)} <small>км</small>
+          </Fact>
+          <Fact label="Азимут">{deg(shown.azimuth)}</Fact>
+          <Fact label="Курс">{deg(shown.course)}</Fact>
+          <Fact label="Скорость">
+            {shown.speed.toFixed(0)} <small>м/с</small>
+          </Fact>
+          <Fact label="Высота">
+            {shown.altitude} <small>м</small>
+          </Fact>
+          <Fact label="Широта">{shown.lat.toFixed(4)}</Fact>
+          <Fact label="Долгота">{shown.lon.toFixed(4)}</Fact>
+          <Fact label="X / Y, км">
+            {km(shown.x)} <small>/</small> {km(shown.y)}
+          </Fact>
         </dl>
 
         {confirming && (
           <div className="confirm" role="alertdialog" aria-label="Подтверждение команды">
             <span>
-              Подтвердить: <b>{ACTION_LABEL[confirming]}</b> по {shown.id}?
+              {ACTION_LABEL[confirming]} <b>{shown.id}</b>?
             </span>
-            <button className="btn" onClick={() => setConfirming(null)}>
+            <button className="btn btn--sm" onClick={() => setConfirming(null)}>
               Отмена
             </button>
-            <button className="btn btn--danger" onClick={() => run(confirming)} autoFocus>
+            <button className="btn btn--sm btn--danger" onClick={() => run(confirming)} autoFocus>
               Подтвердить
             </button>
           </div>
@@ -98,20 +116,23 @@ export function TargetCard() {
 
         <div className="actions">
           <button className="btn btn--danger" disabled={disabled('EW_HANDOFF')} onClick={() => run('EW_HANDOFF')}>
-            {pendingActions.includes('EW_HANDOFF') ? 'Отправка…' : 'Передать в РЭБ'}
+            <IconJam />
+            {label('EW_HANDOFF')}
           </button>
-          <button className="btn btn--primary" disabled={disabled('REQUEST_VIDEO')} onClick={() => run('REQUEST_VIDEO')}>
-            {pendingActions.includes('REQUEST_VIDEO') ? 'Отправка…' : 'Запросить видео'}
+          <button className="btn btn--accent" disabled={disabled('REQUEST_VIDEO')} onClick={() => run('REQUEST_VIDEO')}>
+            <IconVideo />
+            {label('REQUEST_VIDEO')}
           </button>
           <button className="btn" disabled={disabled('DROP_TARGET')} onClick={() => run('DROP_TARGET')}>
-            {pendingActions.includes('DROP_TARGET') ? 'Отправка…' : 'Сбросить цель'}
+            <IconDrop />
+            {label('DROP_TARGET')}
           </button>
         </div>
 
-        {!online && <div className="result result--fail">Нет связи — команды недоступны</div>}
+        {!online && <div className="note note--fail">Нет связи, команды недоступны</div>}
         {online && result && (
-          <div className={`result ${result.ok ? 'result--ok' : 'result--fail'}`}>
-            {clock(result.ts)} · {result.ok ? '✔' : '✖'} {result.message}
+          <div className={`note num ${result.ok ? 'note--ok' : 'note--fail'}`}>
+            {clock(result.ts)} {result.message}
           </div>
         )}
       </div>
@@ -119,11 +140,11 @@ export function TargetCard() {
   )
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <dt>{label}</dt>
-      <dd>{value}</dd>
+      <dd>{children}</dd>
     </div>
   )
 }
